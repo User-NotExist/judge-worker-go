@@ -1,0 +1,26 @@
+# /opt/judge/config/languages.yaml (§5). Adding a language = add the toolchain to the
+# go-judge image, add an entry here, roll out, run the self-test.
+cpp20-gcc13:
+  display: "C++20 (g++ 13)"
+  source_name: main.cpp
+  compile:
+    args: ["/usr/bin/g++", "-O2", "-std=c++20", "-pipe", "-static", "-DONLINE_JUDGE",
+           "-o", "a", "{sources}"]
+    artifact: a
+  run:
+    args: ["./a"]
+  run_procs: 1
+  env: ["PATH=/usr/bin:/bin"]
+  version_args: ["/usr/bin/g++", "--version"]
+
+py312:
+  display: "Python 3.12"
+  source_name: main.py
+  compile:                       # syntax check only; the source itself is the artefact
+    args: ["/usr/bin/python3.12", "-m", "py_compile", "main.py"]
+    artifact: main.py
+  run:
+    args: ["/usr/bin/python3.12", "main.py"]
+  run_procs: 1
+  env: ["PATH=/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE=1", "PYTHONHASHSEED=0"]
+  version_args: ["/usr/bin/python3.12", "--version"]

@@ -1,0 +1,78 @@
+# Local development / smoke-test stack: Redis, RustFS, devapi
+# (stand-in for the API events endpoint), go-judge and judge-worker built from source.
+# Test profile only (§17.9): never run real submissions here.
+#   docker compose -f deploy/dev/compose.yaml up -d --build
+name: judge-dev
+
+services:
+  redis:
+    image: redis:7.4.1
+  rustfs:
+    image: rustfs/rustfs:1.0.2
+    environment: { RUSTFS_ACCESS_KEY: devkey, RUSTFS_SECRET_KEY: devsecret123 }
+  devapi:
+    build: { context: ../.., dockerfile: deploy/dev/Dockerfile.devtools }
+    environment: { API_TOKEN: dev-api-token }
+    ports: ["127.0.0.1:18080:8080"]
+  devtool:
+    build: { context: ../.., dockerfile: deploy/dev/Dockerfile.devtools }
+    entrypoint: ["/usr/local/bin/devtool"]
+    profiles: [tools]
+    volumes: ["../../examples:/examples:ro"]
+
+  go-judge:
+    build: { context: ../../images/go-judge }
+    privileged: true
+    cpus: 4
+    mem_limit: 6g
+    memswap_limit: 6g
+    shm_size: 1g
+    pids_limit: 4096
+    environment: { ES_AUTH_TOKEN: dev-gojudge-token }
+    command: [-http-addr=127.0.0.1:5050, -parallelism=2, -mount-conf=/etc/go-judge/mount.yaml,
+              -file-timeout=30m, -enable-metrics, -monitor-addr=0.0.0.0:5052, -release]
+    ports: ["127.0.0.1:19100:9100"]
+    volumes: ["judge-cache:/var/lib/judge-worker/cache:ro"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5050"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  judge-worker:
+    build: { context: ../.., dockerfile: images/judge-worker/Dockerfile }
+    user: "65532:65532"
+    network_mode: "service:go-judge"
+    cpus: 1
+    mem_limit: 1g
+    memswap_limit: 1g
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment: { WORKER_ID: dev-01 }
+    volumes:
+      - judge-cache:/var/lib/judge-worker/cache
+      - judge-spool:/var/lib/judge-worker/spool
+      - judge-scratch:/var/lib/judge-worker/scratch
+      - judge-state:/var/lib/judge-worker/state
+      - ./config:/etc/judge-worker:ro
+      - ./secrets/worker:/run/secrets/judge:ro
+    tmpfs: ["/tmp:size=256m"]
+    depends_on:
+      go-judge: { condition: service_healthy }
+      redis: { condition: service_started }
+      rustfs: { condition: service_started }
+      devapi: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/judge-worker", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 3m
+    stop_grace_period: 330s
+
+volumes:
+  judge-cache:
+  judge-spool:
+  judge-scratch:
+  judge-state:

@@ -1,0 +1,9 @@
+type: output_only
+limits: { memory_mb: 256, time_ms: {} }
+checker: { kind: default, float_abs: 1e-6 }
+testcases:
+  - { name: "1" }
+  - { name: "2" }
+subtasks:
+  - { index: 0, points: 40, mode: min, testcases: ["1"] }
+  - { index: 1, points: 60, mode: min, testcases: ["2"] }

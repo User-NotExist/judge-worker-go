@@ -1,0 +1,57 @@
+# /opt/judge/config/config.yaml → /etc/judge-worker/config.yaml (§4)
+worker_id: dev-01
+slots: 2
+
+gojudge:
+  url: http://127.0.0.1:5050
+  auth_token_file: /run/secrets/judge/gojudge.token
+  request_timeout_extra: 10s   # added to the run's clockLimit for the HTTP timeout
+
+redis:
+  addr: redis:6379
+  password_file: ""
+  group: workers
+  lanes: [exam, homework, rejudge, practice, build]   # strict priority order
+  idle_poll: 200ms
+  heartbeat: 10s               # dev: short, for the reclaim test
+  reclaim_min_idle: 40s
+  reclaim_every: 10s
+
+api:
+  events_url: http://devapi:8080/internal/judge-events
+  # jobs_url: https://api.internal/internal/judge-jobs    # default: derived from events_url
+  token_file: /run/secrets/judge/api.token
+  spool_dir: /var/lib/judge-worker/spool
+
+storage:                       # RustFS, S3 API, read-only key scoped to the problems bucket
+  endpoint: http://rustfs:9000
+  bucket: problems
+  region: us-east-1
+  access_key_file: /run/secrets/judge/s3.key
+  secret_key_file: /run/secrets/judge/s3.secret
+
+cache:
+  dir: /var/lib/judge-worker/cache
+  max_bytes: 2GiB
+
+limits:
+  compile:  { cpu: 10s, wall: 20s, memory: 1GiB, procs: 50, output: 64KiB }
+  checker:  { cpu: 10s, wall: 20s, memory: 1GiB, procs: 1,  output: 4KiB }
+  stdout_max: 64MiB
+  stderr_max: 4KiB
+  preview_max: 64KiB
+
+scratch_dir: /var/lib/judge-worker/scratch
+
+health:
+  baseline_file: /var/lib/judge-worker/state/baseline.json
+  interval: 10m
+  timing_check: false   # noisy shared host (§17.9)
+  timing_tolerance: 0.10
+  network_probe_ip: 1.1.1.1
+
+# ca_file: /run/secrets/judge/internal-ca.pem   # if API / RustFS use an internal CA
+
+languages_file: /etc/judge-worker/languages.yaml
+metrics_addr: 0.0.0.0:9100
+log_level: debug

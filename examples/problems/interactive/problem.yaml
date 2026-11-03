@@ -1,0 +1,11 @@
+# Guess a hidden number in [1, 10^9] with at most 40 queries "? x"; the manager answers
+# "<", ">" or "=". Answer with "! x".
+type: interactive
+limits:
+  memory_mb: 256
+  time_ms: { cpp20-gcc13: 1000, py312: 3000 }
+testcases:
+  - { name: "1", sample: true }
+  - { name: "2" }
+subtasks:
+  - { index: 0, points: 100, mode: min, testcases: ["1", "2"] }

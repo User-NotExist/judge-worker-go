@@ -1,0 +1,12 @@
+# /etc/systemd/system/judge-tuning.service
+[Unit]
+Description=Judge host tuning
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/judge-tuning.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,5 @@
+# Append to GRUB_CMDLINE_LINUX in /etc/default/grub, then update-grub && reboot (§17.6):
+nosmt transparent_hugepage=madvise
+# /etc/systemd/system.conf:          CPUAffinity=0 1
+# /etc/default/irqbalance:           IRQBALANCE_BANNED_CPULIST=2-5
+# Do NOT use isolcpus for the judging cores.

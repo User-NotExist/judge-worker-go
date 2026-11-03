@@ -1,0 +1,13 @@
+#!/bin/sh
+# /usr/local/sbin/judge-check-host — run at boot and before a host enters rotation (§17.6).
+# Exits non-zero on the first failed check and names it.
+set -u
+fail() { echo "FAIL: $1" >&2; exit 1; }
+test "$(cat /sys/devices/system/cpu/smt/active)" = 0           || fail "SMT active (need nosmt)"
+test "$(cat /proc/sys/kernel/randomize_va_space)" = 0          || fail "ASLR on (kernel.randomize_va_space)"
+test -z "$(swapon --show)"                                      || fail "swap enabled"
+grep -q performance /sys/devices/system/cpu/cpufreq/policy2/scaling_governor || fail "governor on cpu2 not performance"
+test "$(docker inspect -f '{{.HostConfig.CpusetCpus}}' judge-go-judge-1)" = "2-5" || fail "go-judge cpuset not 2-5"
+test "$(docker exec judge-go-judge-1 cat /sys/fs/cgroup/memory.swap.max)" = 0   || fail "go-judge memory.swap.max not 0"
+if docker info 2>&1 | grep -qi 'no swap limit support'; then fail "docker: no swap limit support"; fi
+echo "OK: judge host checks passed"

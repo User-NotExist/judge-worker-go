@@ -1,0 +1,75 @@
+# /opt/judge/compose.yaml — one judge host (§17.3).
+# Image digests are pinned by config management; replace <digest> on rollout.
+name: judge
+
+services:
+  go-judge:
+    image: registry.internal/judge/go-judge@sha256:<digest>
+    privileged: true                     # required: go-judge creates namespaces and cgroups per run
+    cpuset: "2-5"                        # judging cores (§17.6)
+    mem_limit: 6g                        # 4 slots × 1 GiB compile + overhead + /dev/shm
+    memswap_limit: 6g                    # equal to mem_limit = no swap for go-judge and its runs
+    shm_size: 1g
+    pids_limit: 4096
+    env_file: /opt/judge/secrets/go-judge.env   # ES_AUTH_TOKEN=<token>, mode 0600
+    command:
+      - -http-addr=127.0.0.1:5050
+      - -parallelism=4
+      - -mount-conf=/etc/go-judge/mount.yaml
+      - -file-timeout=30m
+      - -enable-metrics
+      - -monitor-addr=0.0.0.0:5052
+      - -release
+    ports:                               # netns is shared, so the worker's port is published here too
+      - "${MGMT_IP}:9100:9100"           # worker metrics, scraped over the management network
+      - "${MGMT_IP}:5052:5052"           # go-judge metrics
+    volumes:
+      - judge-cache:/var/lib/judge-worker/cache:ro     # same path as in the worker (src paths)
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5050"]   # port open; the worker checks /version with the token
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+
+  judge-worker:
+    image: registry.internal/judge/judge-worker@sha256:<digest>
+    user: "65532:65532"
+    network_mode: "service:go-judge"     # 127.0.0.1:5050 reaches go-judge
+    cpuset: "0-1"
+    mem_limit: 1g
+    memswap_limit: 1g
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      WORKER_ID: ${WORKER_ID}            # overrides worker_id in config.yaml
+    volumes:
+      - judge-cache:/var/lib/judge-worker/cache
+      - judge-spool:/var/lib/judge-worker/spool
+      - judge-scratch:/var/lib/judge-worker/scratch
+      - judge-state:/var/lib/judge-worker/state        # timing baseline (root fs is read-only)
+      - /opt/judge/config:/etc/judge-worker:ro
+      - /opt/judge/secrets/worker:/run/secrets/judge:ro
+    tmpfs:
+      - /tmp:size=256m
+    depends_on:
+      go-judge: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/judge-worker", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5m                   # startup self-test compiles and runs programs
+    stop_grace_period: 330s              # running jobs finish on shutdown (§7.3)
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  judge-cache:
+  judge-spool:
+  judge-scratch:
+  judge-state:

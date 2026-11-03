@@ -1,0 +1,68 @@
+# ---- Build output --------------------------------------------------------
+/judge-worker
+/devapi
+/devtool
+/bin/
+/dist/
+/build/
+*.exe
+*.test
+*.prof
+coverage.out
+coverage.html
+cover.out
+# Example outputs are fixtures (examples/solutions/outputonly/*.out) — only ignore stray ones.
+/*.out
+
+# ---- Go workspace / vendoring -------------------------------------------
+go.work
+go.work.sum
+/vendor/
+
+# ---- Secrets: never commit real credentials ------------------------------
+# Production layout (/opt/judge/secrets) if copied into the tree.
+secrets/
+.env
+*.env
+*.token
+*.password
+*.key
+*.secret
+*.pem
+*.crt
+# Keep the documented example and the dummy development credentials the
+# dev stack (deploy/dev/compose.yaml) needs to start.
+!.env.example
+!deploy/dev/secrets/
+!deploy/dev/secrets/worker/
+!deploy/dev/secrets/worker/*
+
+# ---- Runtime state when running the worker outside Docker ----------------
+/var/
+cache/
+spool/
+scratch/
+state/
+baseline.json
+*.jsonl
+*.jsonl.inflight
+
+# ---- Local overrides ------------------------------------------------------
+compose.override.yaml
+docker-compose.override.yml
+config.local.yaml
+*.local.yaml
+
+# ---- Temp, logs, editors, OS --------------------------------------------
+tmp/
+*.tmp
+*.log
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.code-workspace
+.claude/settings.local.json
+.DS_Store
+Thumbs.db

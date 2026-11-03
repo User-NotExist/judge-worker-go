@@ -1,0 +1,12 @@
+# Test profile on a shared host (§17.9). NEVER with real student submissions or the
+# hostile suite: a privileged container is effectively root on this machine.
+#   docker compose -f compose.yaml -f compose.override.test.yaml up -d
+services:
+  go-judge:
+    cpuset: !reset null
+    cpus: 4                       # a CPU share instead of pinned cores
+    mem_limit: 6g
+    memswap_limit: 6g             # still no swap: protects the host and keeps MLE correct
+  judge-worker:
+    cpuset: !reset null
+    cpus: 1

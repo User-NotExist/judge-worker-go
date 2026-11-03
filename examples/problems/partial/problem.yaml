@@ -1,0 +1,13 @@
+# Print the N input numbers in sorted order. The testlib checker gives partial credit:
+# fraction = share of positions that are correct.
+type: batch
+limits:
+  memory_mb: 256
+  time_ms: { cpp20-gcc13: 1000, py312: 3000 }
+checker: { kind: testlib }
+testcases:
+  - { name: "1", sample: true }
+  - { name: "2" }
+subtasks:
+  - { index: 0, points: 0, mode: min, testcases: ["1"] }
+  - { index: 1, points: 100, mode: sum, testcases: ["1", "2"] }

@@ -1,0 +1,5 @@
+deploy/
+examples/
+images/go-judge/
+**/*_test.go
+.git
