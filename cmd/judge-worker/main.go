@@ -29,9 +29,9 @@ import (
 	"judge-worker/internal/lang"
 	"judge-worker/internal/metrics"
 	"judge-worker/internal/pipeline"
+	"judge-worker/internal/pkgcache"
 	"judge-worker/internal/queue"
 	"judge-worker/internal/report"
-	"judge-worker/internal/testdata"
 )
 
 var version = "dev"
@@ -131,12 +131,12 @@ func setup(cfgPath string) (*core, error) {
 		}
 		m.GoJudgeRequests.WithLabelValues(status).Inc()
 	})
-	fetcher, err := testdata.NewS3Fetcher(cfg.Storage.Endpoint, cfg.Storage.Bucket, cfg.Storage.Region, cfg.S3AccessKey, cfg.S3SecretKey, hc.Transport)
+	fetcher, err := pkgcache.NewS3Fetcher(cfg.Storage.Endpoint, cfg.Storage.Bucket, cfg.Storage.Region, cfg.S3AccessKey, cfg.S3SecretKey, hc.Transport)
 	if err != nil {
 		return nil, err
 	}
 	deps := &pipeline.Deps{Cfg: cfg, GJ: gj, Langs: langs, HTTP: hc, Metrics: m}
-	deps.Cache = &testdata.Cache{
+	deps.Cache = &pkgcache.Cache{
 		Dir: cfg.Cache.Dir, MaxBytes: cfg.Cache.MaxBytes.U(), Fetch: fetcher, Compile: deps.HelperCompiler(),
 		Log: log, OnSize: func(n uint64) { m.CacheBytes.Set(float64(n)) },
 	}

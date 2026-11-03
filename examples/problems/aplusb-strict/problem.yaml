@@ -1,0 +1,14 @@
+type: batch
+limits:
+  memory_mb: 256
+  time_ms: { cpp20-gcc13: 1000, py312: 3000 }
+checker: { kind: default, strict: true }   # whitespace layout must match the answer files
+testcases:
+  - { name: "1", sample: true }
+  - { name: "2" }
+  - { name: "3" }
+  - { name: "4" }
+subtasks:
+  - { index: 0, points: 0,  mode: min, testcases: ["1"] }
+  - { index: 1, points: 30, mode: min, testcases: ["2", "3"] }
+  - { index: 2, points: 70, mode: min, testcases: ["2", "3", "4"], depends_on: [1] }

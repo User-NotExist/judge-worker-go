@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"judge-worker/internal/gojudge"
-	"judge-worker/internal/testdata"
+	"judge-worker/internal/pkgcache"
 )
 
 // HelperLanguage is the registry entry used for checkers and managers (§10.4).
@@ -17,11 +17,11 @@ const HelperLanguage = "cpp20-gcc13"
 // HelperCompiler compiles checker/manager sources with testlib in go-judge. The binary is
 // cached in the file store only long enough to download it (raw bytes via GET /file;
 // copyOut would return it as a JSON string, which is not binary-safe).
-func (d *Deps) HelperCompiler() testdata.Compiler {
+func (d *Deps) HelperCompiler() pkgcache.Compiler {
 	return func(ctx context.Context, src []byte) ([]byte, error) {
 		l, ok := d.Langs.Get(HelperLanguage)
 		if !ok {
-			return nil, &testdata.CompileError{Log: "language " + HelperLanguage + " not in registry"}
+			return nil, &pkgcache.CompileError{Log: "language " + HelperLanguage + " not in registry"}
 		}
 		name := "helper.cpp"
 		cmd := d.compileCmd(l, []string{name}, map[string][]byte{name: src}, "-I/usr/include/testlib")
@@ -51,7 +51,7 @@ func (d *Deps) HelperCompiler() testdata.Compiler {
 		}()
 		if r.Status != gojudge.StatusAccepted || !ok {
 			log, _ := compileLog(r, 64<<10)
-			return nil, &testdata.CompileError{Log: log}
+			return nil, &pkgcache.CompileError{Log: log}
 		}
 		var buf bytes.Buffer
 		if _, err := d.GJ.GetFile(ctx, id, &buf, 256<<20); err != nil {

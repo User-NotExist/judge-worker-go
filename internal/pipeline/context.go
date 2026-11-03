@@ -20,8 +20,8 @@ import (
 	"judge-worker/internal/job"
 	"judge-worker/internal/lang"
 	"judge-worker/internal/metrics"
+	"judge-worker/internal/pkgcache"
 	"judge-worker/internal/report"
-	"judge-worker/internal/testdata"
 )
 
 // Deps are shared by all jobs on this worker.
@@ -29,7 +29,7 @@ type Deps struct {
 	Cfg     *config.Config
 	GJ      gojudge.Client
 	Langs   *lang.Registry
-	Cache   *testdata.Cache
+	Cache   *pkgcache.Cache
 	HTTP    *http.Client // presigned URLs
 	Metrics *metrics.M
 
@@ -103,7 +103,7 @@ type jobCtx struct {
 	log     *slog.Logger
 	rep     *report.Reporter
 	scratch string
-	pkg     *testdata.Package
+	pkg     *pkgcache.Package
 	lang    *lang.Language
 
 	fileIDs map[string]bool // go-judge file-store ids to delete at job end
@@ -278,17 +278,17 @@ func (jc *jobCtx) fetch(ctx context.Context, url string, max int64) ([]byte, err
 }
 
 // ensurePackage loads the problem package into the cache and validates it for this job.
-func (jc *jobCtx) ensurePackage(ctx context.Context, o testdata.ValidateOpts) error {
+func (jc *jobCtx) ensurePackage(ctx context.Context, o pkgcache.ValidateOpts) error {
 	p, err := jc.d.Cache.Ensure(ctx, jc.job.Problem.PackageSHA256, jc.job.Problem.PackageKey)
 	if err != nil {
-		var pe *testdata.PackageError
+		var pe *pkgcache.PackageError
 		switch {
 		case errors.As(err, &pe):
 			jc.d.Metrics.Alert(pe.Reason)
 			return sysErr(pe.Reason, "%s", pe.Detail)
 		case errors.Is(err, gojudge.ErrUnavailable):
 			return &transientError{reason: "sandbox_unavailable", err: err}
-		case testdata.IsDiskFull(err):
+		case pkgcache.IsDiskFull(err):
 			return &transientError{reason: "disk_full", err: err}
 		case ctx.Err() != nil:
 			return ctx.Err()

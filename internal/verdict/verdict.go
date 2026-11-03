@@ -14,6 +14,7 @@ const (
 	AC  Verdict = "AC"
 	PA  Verdict = "PA"
 	WA  Verdict = "WA"
+	PE  Verdict = "PE" // presentation error (strict checking only)
 	TLE Verdict = "TLE"
 	MLE Verdict = "MLE"
 	OLE Verdict = "OLE"

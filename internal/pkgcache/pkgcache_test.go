@@ -1,4 +1,4 @@
-package testdata
+package pkgcache
 
 import (
 	"archive/zip"
@@ -69,6 +69,13 @@ func TestProblemValid(t *testing.T) {
 	}
 	if !p.IsSample("1") || p.IsSample("2") {
 		t.Fatal("sample")
+	}
+	if p.Checker.Strict {
+		t.Fatal("strict must default to false")
+	}
+	strictDir := writePkg(t, strings.Replace(goodYAML, "checker: { kind: default }", "checker: { kind: default, strict: true }", 1), allTests())
+	if sp, err := ParseProblem(strictDir); err != nil || !sp.Checker.Strict {
+		t.Fatal("strict not parsed", err)
 	}
 }
 

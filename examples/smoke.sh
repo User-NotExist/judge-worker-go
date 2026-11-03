@@ -34,6 +34,11 @@ check "a+b RE"                    RE  0      -problem $P/aplusb -lang cpp20-gcc1
 check "a+b TLE"                   TLE 0      -problem $P/aplusb -lang cpp20-gcc13 -files $S/aplusb/tle.cpp
 check "a+b MLE"                   MLE 0      -problem $P/aplusb -lang cpp20-gcc13 -files $S/aplusb/mle.cpp
 check "a+b OLE"                   OLE 0      -problem $P/aplusb -lang py312 -files $S/aplusb/ole.py
+check "strict: exact layout AC"     AC  100000 -problem $P/aplusb-strict -lang cpp20-gcc13 -files $S/aplusb/ac.cpp
+check "strict: no final newline AC"  AC  100000 -problem $P/aplusb-strict -lang py312 -files $S/aplusb/no_newline.py
+check "strict: trailing space PE"    PE  0      -problem $P/aplusb-strict -lang cpp20-gcc13 -files $S/aplusb/trailing_space.cpp
+check "strict: wrong answer stays WA" WA 0      -problem $P/aplusb-strict -lang cpp20-gcc13 -files $S/aplusb/wa.cpp
+check "non-strict: trailing space AC" AC 100000 -problem $P/aplusb -lang cpp20-gcc13 -files $S/aplusb/trailing_space.cpp
 check "testlib partial AC"        AC  100000 -problem $P/partial -lang py312 -files $S/partial/ac.py
 check "testlib partial points"    WA  10000  -problem $P/partial -lang py312 -files $S/partial/half.py
 check "interactive AC"            AC  100000 -problem $P/interactive -lang cpp20-gcc13 -files $S/interactive/ac.cpp

@@ -46,9 +46,10 @@ func FromFraction(f float64) verdict.Verdict {
 
 func clamp01(f float64) float64 { return math.Max(0, math.Min(1, f)) }
 
-// ParseTestlib interprets the checker result per the table in §10.3.
+// ParseTestlib interprets a testlib checker result.
 // pointsMax is the denominator for "points X" (problem.yaml checker.points_max, default 1).
-func ParseTestlib(r gojudge.Result, pointsMax float64) TestlibResult {
+// strict reports testlib's presentation error (exit 2) as PE instead of WA.
+func ParseTestlib(r gojudge.Result, pointsMax float64, strict bool) TestlibResult {
 	stderr := r.Files["stderr"]
 	stdout := strings.TrimSpace(r.Files["stdout"])
 	msg, _ := Truncate(strings.TrimSpace(stderr), MaxMessage)
@@ -71,7 +72,12 @@ func ParseTestlib(r gojudge.Result, pointsMax float64) TestlibResult {
 		return TestlibResult{Verdict: verdict.AC, Fraction: 1, Message: msg}
 	case gojudge.StatusNonzeroExit:
 		switch r.ExitStatus {
-		case 1, 2:
+		case 1:
+			return TestlibResult{Verdict: verdict.WA, Fraction: 0, Message: msg}
+		case 2:
+			if strict {
+				return TestlibResult{Verdict: verdict.PE, Fraction: 0, Message: msg}
+			}
 			return TestlibResult{Verdict: verdict.WA, Fraction: 0, Message: msg}
 		case 7:
 			if x, ok := parsePoints(stderr); ok {

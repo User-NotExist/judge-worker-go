@@ -1,7 +1,8 @@
-package testdata
+package pkgcache
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +28,7 @@ type Testcase struct {
 
 type Subtask struct {
 	Index     int      `yaml:"index"`
-	Points    *int64   `yaml:"points"`
+	Points    *float64 `yaml:"points"` // a number, so 2.5 is rejected instead of truncated
 	Mode      string   `yaml:"mode"`
 	Testcases []string `yaml:"testcases"`
 	DependsOn []int    `yaml:"depends_on"`
@@ -44,6 +45,9 @@ type Problem struct {
 		FloatAbs  *float64 `yaml:"float_abs"`
 		FloatRel  *float64 `yaml:"float_rel"`
 		PointsMax float64  `yaml:"points_max"` // denominator for testlib "points X"; default 1
+		// Strict enables the PE verdict: the default checker also compares whitespace
+		// layout, and a testlib exit code 2 is reported as PE instead of WA.
+		Strict bool `yaml:"strict"`
 	} `yaml:"checker"`
 	Testcases []Testcase `yaml:"testcases"`
 	Subtasks  []Subtask  `yaml:"subtasks"`
@@ -86,7 +90,7 @@ func (p *Problem) SubtasksOf(tc string) []int {
 func (p *Problem) ScoreSubtasks() []score.Subtask {
 	out := make([]score.Subtask, len(p.Subtasks))
 	for i, st := range p.Subtasks {
-		out[i] = score.Subtask{Index: st.Index, Points: *st.Points, Mode: score.Mode(st.Mode), Testcases: st.Testcases, DependsOn: st.DependsOn}
+		out[i] = score.Subtask{Index: st.Index, Points: int64(*st.Points), Mode: score.Mode(st.Mode), Testcases: st.Testcases, DependsOn: st.DependsOn}
 	}
 	return out
 }
@@ -164,7 +168,7 @@ func (p *Problem) validateStatic(dir string) error {
 			add("subtask index %d duplicated", st.Index)
 		}
 		seenIdx[st.Index] = i
-		if st.Points == nil || *st.Points < 0 {
+		if st.Points == nil || *st.Points < 0 || *st.Points != math.Trunc(*st.Points) || *st.Points > 1e12 {
 			add("subtask %d: points must be a non-negative integer", st.Index)
 		}
 		if st.Mode == "" {

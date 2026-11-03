@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"judge-worker/internal/job"
+	"judge-worker/internal/pkgcache"
 	"judge-worker/internal/report"
 	"judge-worker/internal/score"
-	"judge-worker/internal/testdata"
 	"judge-worker/internal/verdict"
 )
 
@@ -49,14 +49,14 @@ func (d *Deps) RunJudge(ctx context.Context, j *job.Job, slot int, rep *report.R
 
 func (jc *jobCtx) judge(ctx context.Context) (score.Result, error) {
 	j := jc.job
-	if err := jc.ensurePackage(ctx, testdata.ValidateOpts{Language: j.Language, RequireAnswers: true}); err != nil {
+	if err := jc.ensurePackage(ctx, pkgcache.ValidateOpts{Language: j.Language, RequireAnswers: true}); err != nil {
 		return score.Result{}, err
 	}
 	p := jc.pkg.Problem
 	var runner score.Runner
 
 	switch p.Type {
-	case testdata.OutputOnly:
+	case pkgcache.OutputOnly:
 		if j.Language != job.OutputOnly {
 			return score.Result{}, sysErr("bad_job", "output_only problem judged as %s", j.Language)
 		}
@@ -67,7 +67,7 @@ func (jc *jobCtx) judge(ctx context.Context) (score.Result, error) {
 		jc.sources = files
 		runner = jc.outputOnlyCase(ctx)
 
-	case testdata.Batch, testdata.Interactive:
+	case pkgcache.Batch, pkgcache.Interactive:
 		if j.Language == job.OutputOnly {
 			return score.Result{}, sysErr("bad_job", "language output-only for %s problem", p.Type)
 		}
@@ -93,7 +93,7 @@ func (jc *jobCtx) judge(ctx context.Context) (score.Result, error) {
 			return score.Result{Verdict: verdict.CE, SubtaskMilli: make([]int64, len(p.Subtasks))}, errCompile
 		}
 		jc.binary = co.FileID
-		if p.Type == testdata.Batch {
+		if p.Type == pkgcache.Batch {
 			runner = jc.batchCase(ctx)
 		} else {
 			runner = jc.interactiveCase(ctx)

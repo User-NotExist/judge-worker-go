@@ -154,14 +154,83 @@ func TestParseTestlib(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := ParseTestlib(c.r, c.max)
+			got := ParseTestlib(c.r, c.max, false)
 			if got.Verdict != c.v || (c.v != verdict.JE && got.Fraction != c.f) {
 				t.Fatalf("got %+v want %s %v", got, c.v, c.f)
 			}
 		})
 	}
-	long := ParseTestlib(res("Nonzero Exit Status", 1, "", "wrong answer "+strings.Repeat("x", 5000)), 1)
+	long := ParseTestlib(res("Nonzero Exit Status", 1, "", "wrong answer "+strings.Repeat("x", 5000)), 1, false)
 	if len(long.Message) > MaxMessage || !strings.HasPrefix(long.Message, "wrong answer ") {
 		t.Fatal(len(long.Message))
+	}
+}
+
+func TestTestlibStrictPE(t *testing.T) {
+	pe := res("Nonzero Exit Status", 2, "", "wrong output format Expected EOLN")
+	if got := ParseTestlib(pe, 1, true); got.Verdict != verdict.PE || got.Fraction != 0 || got.Message != "wrong output format Expected EOLN" {
+		t.Fatal(got)
+	}
+	if got := ParseTestlib(pe, 1, false); got.Verdict != verdict.WA {
+		t.Fatal("non-strict exit 2 stays WA", got)
+	}
+	if got := ParseTestlib(res("Nonzero Exit Status", 1, "", "wa"), 1, true); got.Verdict != verdict.WA {
+		t.Fatal("strict exit 1 stays WA", got)
+	}
+}
+
+func TestStrictLayout(t *testing.T) {
+	strict := Options{Strict: true}
+	ans := "1 2\n3\n"
+	accepted := []string{
+		"1 2\n3\n",     // identical
+		"1 2\n3",       // missing final newline
+		"1 2\r\n3\r\n", // Windows line endings
+	}
+	for _, out := range accepted {
+		if r := cmp(t, out, ans, strict); r.Fraction != 1 || r.PresentationError {
+			t.Fatalf("%q: %+v", out, r)
+		}
+	}
+	pe := map[string]string{
+		"1  2\n3\n":  `presentation error before token 2: expected " ", found "  "`,
+		"1\n2\n3\n":  `presentation error before token 2: expected " ", found "\n"`,
+		"1 2 3\n":    `presentation error before token 3: expected "\n", found " "`,
+		" 1 2\n3\n":  `presentation error at start of output: expected nothing, found " "`,
+		"1 2\n3 \n":  `presentation error at end of output: expected "\n", found " \n"`,
+		"1 2\n3\n\n": `presentation error at end of output: expected "\n", found "\n\n"`,
+		"1 2\t\n3\n": `presentation error before token 3: expected "\n", found "\t\n"`,
+	}
+	for out, msg := range pe {
+		r := cmp(t, out, ans, strict)
+		if r.Fraction != 0 || !r.PresentationError || r.Message != msg {
+			t.Fatalf("%q: got %+v, want %q", out, r, msg)
+		}
+		// Non-strict mode accepts the same output.
+		if r := cmp(t, out, ans, Options{}); r.Fraction != 1 {
+			t.Fatalf("non-strict %q: %+v", out, r)
+		}
+	}
+	// A wrong token wins over a layout difference: WA, not PE.
+	r := cmp(t, "1\n2\n4\n", ans, strict)
+	if r.PresentationError || r.Fraction != 0 || r.Message != "token 3: expected 3, found 4" {
+		t.Fatal(r)
+	}
+	// Float tolerance still applies to tokens in strict mode.
+	r = cmp(t, "1.0000001 2\n3\n", "1 2\n3\n", Options{Strict: true, FloatAbs: f64(1e-6)})
+	if r.Fraction != 1 {
+		t.Fatal(r)
+	}
+	// Long whitespace runs are summarised, not copied.
+	r = cmp(t, "1"+strings.Repeat(" ", 100000)+"2\n3\n", ans, strict)
+	if !r.PresentationError || !strings.Contains(r.Message, "100000 whitespace chars") {
+		t.Fatal(r)
+	}
+	// Empty answer: empty output or a lone newline is fine, anything else is PE.
+	if r := cmp(t, "\n", "", strict); r.Fraction != 1 {
+		t.Fatal(r)
+	}
+	if r := cmp(t, "\n\n", "", strict); !r.PresentationError {
+		t.Fatal(r)
 	}
 }

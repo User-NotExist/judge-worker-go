@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"judge-worker/internal/job"
+	"judge-worker/internal/pkgcache"
 	"judge-worker/internal/report"
-	"judge-worker/internal/testdata"
 	"judge-worker/internal/verdict"
 )
 
@@ -68,11 +68,11 @@ func (d *Deps) RunBuild(ctx context.Context, j *job.Job, slot int, rep *report.R
 
 func (jc *jobCtx) build(ctx context.Context) (report.BuildDone, error) {
 	j := jc.job
-	if err := jc.ensurePackage(ctx, testdata.ValidateOpts{RequireAnswers: false}); err != nil {
+	if err := jc.ensurePackage(ctx, pkgcache.ValidateOpts{RequireAnswers: false}); err != nil {
 		return report.BuildDone{}, err
 	}
 	p := jc.pkg.Problem
-	if p.Type != testdata.Batch {
+	if p.Type != pkgcache.Batch {
 		return report.BuildDone{}, sysErr("unsupported_problem_type", "build jobs support batch problems only, got %s", p.Type)
 	}
 	l, ok := jc.d.Langs.Get(j.Reference.Language)

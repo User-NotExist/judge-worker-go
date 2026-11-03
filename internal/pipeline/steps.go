@@ -13,8 +13,8 @@ import (
 	"judge-worker/internal/gojudge"
 	"judge-worker/internal/job"
 	"judge-worker/internal/lang"
+	"judge-worker/internal/pkgcache"
 	"judge-worker/internal/report"
-	"judge-worker/internal/testdata"
 	"judge-worker/internal/verdict"
 )
 
@@ -216,13 +216,16 @@ func (jc *jobCtx) check(ctx context.Context, tc string, out output, outPath stri
 			return checked{}, &judgeError{detail: "answer file: " + err.Error()}
 		}
 		defer ans.Close()
-		o, err := checker.Compare(rd, ans, checker.Options{FloatAbs: p.Checker.FloatAbs, FloatRel: p.Checker.FloatRel})
+		o, err := checker.Compare(rd, ans, checker.Options{FloatAbs: p.Checker.FloatAbs, FloatRel: p.Checker.FloatRel, Strict: p.Checker.Strict})
 		if err != nil {
 			return checked{}, &judgeError{detail: "default checker: " + err.Error()}
 		}
 		v := verdict.WA
-		if o.Fraction >= 1 {
+		switch {
+		case o.Fraction >= 1:
 			v = verdict.AC
+		case o.PresentationError:
+			v = verdict.PE
 		}
 		return checked{Verdict: v, Fraction: o.Fraction, Message: o.Message}, nil
 	}
@@ -249,7 +252,7 @@ func (jc *jobCtx) check(ctx context.Context, tc string, out output, outPath stri
 	if err != nil {
 		return checked{}, err
 	}
-	t := checker.ParseTestlib(res[0], p.Checker.PointsMax)
+	t := checker.ParseTestlib(res[0], p.Checker.PointsMax, p.Checker.Strict)
 	if t.Verdict == verdict.JE {
 		jc.d.Metrics.Alert("checker_failed")
 		jc.log.Error("checker failed", "testcase", tc, "status", res[0].Status, "exit", res[0].ExitStatus)
@@ -258,14 +261,14 @@ func (jc *jobCtx) check(ctx context.Context, tc string, out output, outPath stri
 	return checked{Verdict: t.Verdict, Fraction: t.Fraction, Message: t.Message}, nil
 }
 
-func inputFile(p *testdata.Package, tc string) *gojudge.File {
+func inputFile(p *pkgcache.Package, tc string) *gojudge.File {
 	if _, err := os.Stat(p.InputPath(tc)); err != nil {
 		return &gojudge.File{Content: gojudge.Str("")} // output-only problems may have no .in
 	}
 	return &gojudge.File{Src: p.InputPath(tc)}
 }
 
-func answerFile(p *testdata.Package, tc string) *gojudge.File {
+func answerFile(p *pkgcache.Package, tc string) *gojudge.File {
 	if _, err := os.Stat(p.AnswerPath(tc)); err != nil {
 		return &gojudge.File{Content: gojudge.Str("")}
 	}

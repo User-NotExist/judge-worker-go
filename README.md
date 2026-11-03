@@ -485,6 +485,7 @@ checker:
   kind: default                # default | testlib
   float_abs: 1e-6              # default checker only; omit both for exact token compare
   float_rel: 1e-6
+  strict: false                # true = also report presentation errors (PE); see "Strict mode"
   # points_max: 100            # testlib only: "points X" is divided by this (default 1)
 testcases:                     # declaration order = execution order
   - { name: "1", sample: true }
@@ -516,7 +517,8 @@ Packages that fail permanently are remembered, so later jobs fail fast without d
 |---|---|---|
 | exit 0 | 1 | AC |
 | exit 0 with a number in [0, 1] on stdout | that number | AC / PA / WA |
-| exit 1 (WA) or 2 (PE) | 0 | WA |
+| exit 1 (WA) | 0 | WA |
+| exit 2 (PE) | 0 | WA, or **PE** when `checker.strict: true` |
 | exit 7 with stderr `points X …` (testlib `quitp`) | X / `points_max`, clamped to [0, 1] | AC / PA / WA |
 | exit 3 (`_fail`), any other exit, crash or timeout | — | **JE** |
 
@@ -680,6 +682,7 @@ The worker uses go-judge's `POST /run`, `GET /file/{id}`, `POST /file`, `DELETE 
 | `AC` | Accepted |
 | `PA` | Partially accepted (fraction strictly between 0 and 1) |
 | `WA` | Wrong answer, or a missing output-only file |
+| `PE` | Presentation error: the content is right but the layout is wrong. Only produced when the problem sets `checker.strict: true` ([Strict mode](#strict-mode-presentation-errors)). Score 0. |
 | `TLE` | CPU or wall-clock limit exceeded (message `cpu 1.02 s` / `wall 3.00 s`) |
 | `MLE` | Memory limit exceeded (`peak 257 MiB`) |
 | `OLE` | stdout larger than `stdout_max` |
@@ -688,7 +691,7 @@ The worker uses go-judge's `POST /run`, `GET /file/{id}`, `POST /file`, `DELETE 
 | `SE` | System error (see the reason codes) |
 | `JE` | Judge error: a checker or interactor failed (no score) |
 
-- **Default checker:** compares whitespace-separated tokens byte for byte. If `float_abs` / `float_rel` are set, two finite numbers also match when `|a−b| ≤ float_abs` or `|a−b| ≤ float_rel·|b|`. Extra or missing tokens are WA. Example message: `token 17: expected 42, found 41`.
+- **Default checker:** compares whitespace-separated tokens byte for byte. If `float_abs` / `float_rel` are set, two finite numbers also match when `|a−b| ≤ float_abs` or `|a−b| ≤ float_rel·|b|`. Extra or missing tokens are WA. Example message: `token 17: expected 42, found 41`. By default whitespace is ignored: `1 2 3`, `1\n2\n3` and `  1 2 3  \r\n\n` all match the answer `1 2 3`. To check spacing too, turn on [strict mode](#strict-mode-presentation-errors).
 - **Contestant stderr** is capped at `stderr_max` and truncated; overflowing stderr does not fail a run.
 - **Subtask scoring:**
   - Subtasks are evaluated in index order. Testcases run in `problem.yaml` declaration order, and a testcase shared by several subtasks runs only once per job.
@@ -696,6 +699,49 @@ The worker uses go-judge's `POST /run`, `GET /file/{id}`, `POST /file`, `DELETE 
   - In `sum` mode, a subtask is worth `points × mean(fractions)`, with no early stop.
   - A subtask whose `depends_on` subtasks did not score full points gets 0, and its testcases are skipped.
   - Scores are integer milli-points, rounded down per subtask. `done.verdict` is the first non-AC testcase verdict in execution order, otherwise AC.
+
+### Strict mode (presentation errors)
+
+Set `checker.strict: true` in `problem.yaml` to enable the `PE` verdict for that problem. Without it, problems behave exactly as described above and `PE` is never reported.
+
+```yaml
+checker:
+  kind: default
+  strict: true
+```
+
+**With the default checker**, tokens are compared first, exactly as in normal mode, and float tolerances still apply. Only when **every token matches** is the whitespace layout compared with the answer file:
+
+- every separator between tokens must be identical (`" "` is not `"  "`, `"\t"` or `"\n"`)
+- no whitespace before the first token unless the answer has it
+- the end of the output must match the answer's trailing whitespace
+
+Two differences are always tolerated:
+
+- `\r\n` counts as `\n` (Windows line endings)
+- if the answer ends with no newline or exactly one, the output may also end with either
+
+A wrong token is still reported as `WA` even if the layout is also wrong. The answer files define the exact expected layout, so make sure they don't contain stray trailing spaces.
+
+| Output (answer is `1 2\n3\n`) | Normal | Strict | Strict message |
+|---|---|---|---|
+| `1 2\n3\n` | AC | AC | |
+| `1 2\n3` (no final newline) | AC | AC | |
+| `1 2\r\n3\r\n` | AC | AC | |
+| `1  2\n3\n` | AC | **PE** | `presentation error before token 2: expected " ", found "  "` |
+| `1 2 3\n` | AC | **PE** | `presentation error before token 3: expected "\n", found " "` |
+| ` 1 2\n3\n` | AC | **PE** | `presentation error at start of output: expected nothing, found " "` |
+| `1 2\n3 \n` | AC | **PE** | `presentation error at end of output: expected "\n", found " \n"` |
+| `1 2\n3\n\n` | AC | **PE** | `presentation error at end of output: expected "\n", found "\n\n"` |
+| `1 2\n4\n` | WA | WA | `token 3: expected 3, found 4` |
+
+Long whitespace runs are summarised in the message: the first 32 characters, then `… (100000 whitespace chars)`.
+
+**With a testlib checker**, the checker decides what counts as a formatting error, typically through testlib's strict reading (`readSpace()`, `readEoln()`, `readEof()`) or an explicit `quitf(_pe, …)`. In strict mode, exit code 2 is reported as `PE` with the checker's message. Without strict mode it stays `WA`.
+
+Strict mode doesn't apply to interactive problems: there the interactor alone decides the result.
+
+**For API and UI integrators:** `PE` can appear as a `test_result.verdict` and as the `done.verdict` (the first non-AC testcase in execution order). It scores 0, like `WA`. Your API should accept it as a verdict value.
 
 ---
 
@@ -779,7 +825,7 @@ JSON lines on stdout (collected by Docker's `json-file` driver; ship them to you
 ```sh
 go test ./...                                              # unit tests, no Docker needed
 docker compose -f deploy/dev/compose.yaml up -d --build    # Redis, RustFS, devapi, go-judge, worker
-examples/smoke.sh                                          # 18 end-to-end cases (AC/WA/CE/RE/TLE/MLE/OLE, testlib, interactive, output-only, function tasks)
+examples/smoke.sh                                          # 23 end-to-end cases (AC/WA/PE/CE/RE/TLE/MLE/OLE, strict mode, testlib, interactive, output-only, function tasks)
 docker compose -f deploy/dev/compose.yaml down -v          # stop and delete volumes
 ```
 
@@ -823,6 +869,7 @@ curl -s localhost:19100/metrics | grep ^judge_             # worker metrics in t
 Example problems are in [examples/problems/](examples/problems/):
 
 - `aplusb`: batch, default checker, subtasks
+- `aplusb-strict`: the same problem with `checker.strict: true`
 - `aplusb-staging`: no `.ans` files, for build jobs
 - `partial`: testlib checker with partial points
 - `interactive`: guess the number
@@ -843,9 +890,9 @@ internal/lang           language registry
 internal/job            job types and validation
 internal/queue          Redis Streams consumer: lanes, fairness, heartbeat, reclaim, ack
 internal/gojudge        go-judge REST client
-internal/testdata       package download, verification, safe unzip, cache + LRU eviction, problem.yaml
+internal/pkgcache       package download, verification, safe unzip, cache + LRU eviction, problem.yaml
 internal/pipeline       batch / interactive / output-only / build pipelines, checker & interactor compile
-internal/checker        default token checker, testlib result parsing
+internal/checker        default token checker (incl. strict layout mode), testlib result parsing
 internal/verdict        go-judge status → verdict
 internal/score          subtask scoring
 internal/report         events client, spool, replay

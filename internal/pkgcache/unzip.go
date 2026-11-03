@@ -1,4 +1,4 @@
-package testdata
+package pkgcache
 
 import (
 	"archive/zip"

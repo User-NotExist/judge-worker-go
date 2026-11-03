@@ -1,5 +1,5 @@
-// Package testdata downloads, verifies, unpacks and caches problem packages (§9).
-package testdata
+// Package pkgcache downloads, verifies, unpacks and caches problem packages.
+package pkgcache
 
 import (
 	"context"
